@@ -2,52 +2,42 @@ import { Layout } from "@/components/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Search, Mail, Phone, MapPin } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
-interface Employee {
+interface Profile {
   id: string;
-  name: string;
-  position: string;
-  department: string;
+  full_name: string;
   email: string;
-  phone: string;
-  location: string;
-  imageUrl: string;
+  avatar_url: string | null;
+  created_at: string;
 }
 
 const Employees = () => {
-  const [employees] = useState<Employee[]>([
-    {
-      id: "1",
-      name: "John Doe",
-      position: "Senior Developer",
-      department: "Engineering",
-      email: "john.doe@company.com",
-      phone: "+1 234 567 890",
-      location: "New York, USA",
-      imageUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      position: "Product Manager",
-      department: "Product",
-      email: "jane.smith@company.com",
-      phone: "+1 234 567 891",
-      location: "San Francisco, USA",
-      imageUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jane",
-    },
-    {
-      id: "3",
-      name: "Bob Johnson",
-      position: "HR Specialist",
-      department: "Human Resources",
-      email: "bob.johnson@company.com",
-      phone: "+1 234 567 892",
-      location: "Chicago, USA",
-      imageUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
-    },
-  ]);
+  const [employees, setEmployees] = useState<Profile[]>([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*');
+      
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch employees",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setEmployees(data || []);
+    };
+
+    fetchEmployees();
+  }, [toast]);
 
   return (
     <Layout>
@@ -77,14 +67,13 @@ const Employees = () => {
             <Card key={employee.id} className="p-6">
               <div className="flex items-start space-x-4">
                 <img
-                  src={employee.imageUrl}
-                  alt={employee.name}
+                  src={employee.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${employee.email}`}
+                  alt={employee.full_name}
                   className="w-16 h-16 rounded-full"
                 />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-lg">{employee.name}</h3>
-                  <p className="text-sm text-gray-600">{employee.position}</p>
-                  <p className="text-sm text-gray-500">{employee.department}</p>
+                  <h3 className="font-semibold text-lg">{employee.full_name}</h3>
+                  <p className="text-sm text-gray-500">Employee</p>
                   
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center text-sm text-gray-600">
@@ -93,11 +82,11 @@ const Employees = () => {
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <Phone className="w-4 h-4 mr-2" />
-                      {employee.phone}
+                      Contact HR for details
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <MapPin className="w-4 h-4 mr-2" />
-                      {employee.location}
+                      Remote
                     </div>
                   </div>
                 </div>
