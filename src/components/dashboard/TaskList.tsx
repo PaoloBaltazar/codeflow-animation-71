@@ -5,7 +5,8 @@ import { CheckCircle2, Clock, AlertCircle, User, Trash2 } from "lucide-react";
 import { Task } from "@/types/task";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { checkTaskDeadlines, handleTaskStatusChange } from "@/utils/notificationUtils";
+import { useEffect } from "react";
+import { handleTaskStatusChange } from "@/utils/notificationUtils";
 
 const getPriorityColor = (priority: Task["priority"]) => {
   switch (priority) {
@@ -46,6 +47,28 @@ export const TaskList = ({
 }: TaskListProps) => {
   const { toast } = useToast();
 
+  // Subscribe to real-time updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('tasks_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks'
+        },
+        () => {
+          onTasksChange();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [onTasksChange]);
+
   const handleStatusClick = async (task: Task) => {
     if (!onStatusChange) return;
     
@@ -62,7 +85,7 @@ export const TaskList = ({
 
       if (updateError) throw updateError;
 
-      // Then handle notifications
+      // Then handle notifications with the updated task data
       const updatedTask = { ...task, status: nextStatus };
       await handleTaskStatusChange(updatedTask);
       

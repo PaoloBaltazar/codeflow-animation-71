@@ -1,96 +1,75 @@
 import { supabase } from "@/lib/supabase";
-import { addDays, parseISO, isPast } from "date-fns";
 import { Task } from "@/types/task";
 
-export const createNotification = async (
-  userId: string,
-  title: string,
-  message: string,
-  type: "deadline" | "overdue" | "status" | "completed",
-  taskId: string
-) => {
-  // Get the actual user ID from the auth session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error("No authenticated session found");
-  }
+export const createNotification = async (notification: {
+  title: string;
+  message: string;
+  type: string;
+  task_id: string;
+  user_id: string;
+}) => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .insert([notification]);
 
-  const { error } = await supabase
-    .from("notifications")
-    .insert([
-      {
-        user_id: session.user.id, // Use the actual UUID from the session
-        title,
-        message,
-        type,
-        task_id: taskId,
-      },
-    ]);
-
-  if (error) {
+    if (error) throw error;
+  } catch (error) {
     console.error("Error creating notification:", error);
     throw error;
   }
 };
 
-export const checkTaskDeadlines = async (task: Task) => {
-  const deadlineDate = parseISO(task.deadline);
-  const twoDaysFromNow = addDays(new Date(), 2);
+export const checkTaskDeadlines = async (tasks: Task[]) => {
+  const today = new Date();
   
-  // Get the actual user ID from the auth session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error("No authenticated session found");
-  }
+  for (const task of tasks) {
+    const deadline = new Date(task.deadline);
+    const daysDiff = Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Check if task is due within 2 days and not completed
-  if (deadlineDate <= twoDaysFromNow && task.status !== "completed") {
-    // Notify using the actual user ID
-    await createNotification(
-      session.user.id,
-      "Task Due Soon",
-      `The task "${task.title}" is due on ${task.deadline}`,
-      "deadline",
-      task.id
-    );
-  }
-
-  // Check if task is overdue
-  if (isPast(deadlineDate) && task.status !== "completed") {
-    // Notify using the actual user ID
-    await createNotification(
-      session.user.id,
-      "Task Overdue",
-      `The task "${task.title}" is overdue`,
-      "overdue",
-      task.id
-    );
+    if (daysDiff <= 2 && task.status !== "completed") {
+      try {
+        await createNotification({
+          title: "Task Deadline Approaching",
+          message: `Task "${task.title}" is due in ${daysDiff} days`,
+          type: "deadline",
+          task_id: task.id,
+          user_id: task.user_id,
+        });
+      } catch (error) {
+        console.error("Error checking task deadlines:", error);
+      }
+    }
   }
 };
 
 export const handleTaskStatusChange = async (task: Task) => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error("No authenticated session found");
-  }
+  try {
+    let notificationType = "";
+    let message = "";
 
-  // Notify using the actual user ID
-  await createNotification(
-    session.user.id,
-    "Task Status Updated",
-    `Task "${task.title}" status has been updated to ${task.status}`,
-    "status",
-    task.id
-  );
+    switch (task.status) {
+      case "completed":
+        notificationType = "completed";
+        message = `Task "${task.title}" has been completed`;
+        break;
+      case "in-progress":
+        notificationType = "status";
+        message = `Task "${task.title}" is now in progress`;
+        break;
+      default:
+        return; // Don't create notification for pending status
+    }
 
-  // If task is completed, send another notification
-  if (task.status === "completed") {
-    await createNotification(
-      session.user.id,
-      "Task Completed",
-      `Task "${task.title}" has been marked as completed`,
-      "completed",
-      task.id
-    );
+    await createNotification({
+      title: "Task Status Update",
+      message,
+      type: notificationType,
+      task_id: task.id,
+      user_id: task.user_id,
+    });
+  } catch (error) {
+    console.error("Error handling task status change:", error);
+    throw error;
   }
 };
