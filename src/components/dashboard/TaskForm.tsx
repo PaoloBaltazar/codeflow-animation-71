@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +22,13 @@ import { Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  avatar_url: string | null;
+}
+
 interface TaskFormProps {
   onTaskCreated: (task: Task) => void;
 }
@@ -32,8 +39,30 @@ export const TaskForm = ({ onTaskCreated }: TaskFormProps) => {
   const [deadline, setDeadline] = useState("");
   const [priority, setPriority] = useState<Task["priority"]>("medium");
   const [assignedTo, setAssignedTo] = useState("");
+  const [employees, setEmployees] = useState<Profile[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*');
+      
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch employees",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setEmployees(data as Profile[]);
+    };
+
+    fetchEmployees();
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,13 +79,24 @@ export const TaskForm = ({ onTaskCreated }: TaskFormProps) => {
       return;
     }
 
+    // Find the assigned employee's email
+    const assignedEmployee = employees.find(emp => emp.id === assignedTo);
+    if (!assignedEmployee) {
+      toast({
+        title: "Error",
+        description: "Please select a valid assignee",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newTask = {
       title,
       deadline,
       priority,
       status: "pending" as const,
       created_by: user.email || "Unknown",
-      assigned_to: assignedTo,
+      assigned_to: assignedEmployee.email,
       user_id: user.id,
     };
 
@@ -94,9 +134,6 @@ export const TaskForm = ({ onTaskCreated }: TaskFormProps) => {
     setAssignedTo("");
     setOpen(false);
   };
-
-  // Mock users list - in a real app this would come from your users database
-  const users = ["John Doe", "Jane Smith", "Bob Johnson"];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -170,9 +207,9 @@ export const TaskForm = ({ onTaskCreated }: TaskFormProps) => {
                 <SelectValue placeholder="Select assignee" />
               </SelectTrigger>
               <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user} value={user}>
-                    {user}
+                {employees.map((employee) => (
+                  <SelectItem key={employee.id} value={employee.id}>
+                    {employee.full_name}
                   </SelectItem>
                 ))}
               </SelectContent>

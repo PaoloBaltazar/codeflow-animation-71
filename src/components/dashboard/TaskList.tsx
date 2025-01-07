@@ -129,11 +129,15 @@ export const TaskList = ({
                 <h3 className="font-medium text-sm md:text-base">{task.title}</h3>
                 <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">Due {task.deadline}</p>
                 {showAssignment && (
-                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                    <User className="w-3 h-3" />
-                    <span>Created by {task.created_by}</span>
-                    <span>•</span>
-                    <span>Assigned to {task.assigned_to}</span>
+                  <div className="flex flex-col gap-1 mt-1 text-xs text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <User className="w-3 h-3" />
+                      <span>Created by: {task.created_by}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User className="w-3 h-3" />
+                      <span>Assigned to: {task.assigned_to}</span>
+                    </div>
                   </div>
                 )}
               </div>
